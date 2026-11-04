@@ -36,8 +36,8 @@ from this directory.
 The pattern-map figures (cells 2–3) simulate their light curves on the fly; that
 takes a few seconds. By default the (η, 𝒬) figures (cells 5–6) load the saved grid
 JSON files. To rerun those simulations from scratch, delete or rename the two
-JSON files before running the notebook. Each grid then takes roughly 30–40 minutes
-on 11 cores. The work is spread over all CPUs, and every run has a fixed seed, so
+JSON files before running the notebook. Each grid then takes about 10 minutes on
+an 11-core laptop. The work is spread over all CPUs, and every run has a fixed seed, so
 the result doesn't depend on how many workers you use. The grids can also be
 regenerated outside the notebook:
 
