@@ -1,8 +1,16 @@
-# Bicoherence patterns from a light-curve model: figure code
+# "Bicoherence States from QPO--Accretion Flow Coupling in Black Hole X-ray Binaries": figure code
 
 This repository holds the simulation code and the notebook that make the
 simulated-light-curve figures in the paper (the web / cross / hypotenuse / point
 pattern maps and the (η, 𝒬) pattern planes).
+
+## Paper information
+
+If using any code in this repository, please cite:
+
+S. R. Larner 2026, submitted to ApJ 
+
+(TODO: update with arXiv link and published copy link when available)
 
 ## Contents
 
