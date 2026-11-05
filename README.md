@@ -1,8 +1,6 @@
-# "Bicoherence States from QPO--Accretion Flow Coupling in Black Hole X-ray Binaries": figure code
+# "Bicoherence States from QPO--Accretion Flow Coupling in Black Hole X-ray Binaries": numerical simulation and figure code
 
-This repository holds the simulation code and the notebook that make the
-simulated-light-curve figures in the paper (the web / cross / hypotenuse / point
-pattern maps and the (η, 𝒬) pattern planes).
+This repository holds the simulation code and the notebook that make the simulated-light-curve figures in the paper (the web / cross / hypotenuse / point pattern maps and the (η, 𝒬) pattern planes).
 
 ## Paper information
 
@@ -20,7 +18,7 @@ S. R. Larner 2026, submitted to ApJ
 | `sim_dQ_grid.py` | Runs a grid of simulations over QPO amplitude `a1` and dilution rms, classifies each run's pattern, and draws the (η, 𝒬) plane. Imports `sim_lightcurve`. |
 | `paper_figs.ipynb` | Builds every figure below. |
 | `sim_dQ_grid_extra_dense.json`, `sim_dQ_grid_extra_dense_web.json` | Saved results of the two 31 × 36 grids (1116 runs each) used by the (η, 𝒬) figures. |
-| `figures/` | The figure PDFs as the notebook writes them. |
+| `figures/` | The figure PDFs which are used in the paper. |
 
 ## Figures
 
@@ -41,13 +39,7 @@ jupyter nbconvert --to notebook --execute --inplace paper_figs.ipynb
 Or open `paper_figs.ipynb` in Jupyter and run all cells. The notebook must be run
 from this directory.
 
-The pattern-map figures (cells 2–3) simulate their light curves on the fly; that
-takes a few seconds. By default the (η, 𝒬) figures (cells 5–6) load the saved grid
-JSON files. To rerun those simulations from scratch, delete or rename the two
-JSON files before running the notebook. Each grid then takes about 10 minutes on
-an 11-core laptop. The work is spread over all CPUs, and every run has a fixed seed, so
-the result doesn't depend on how many workers you use. The grids can also be
-regenerated outside the notebook:
+If the json files are available, the notebook simply loads them to make the (η, 𝒬) figures. Otherwise, regenerating the extra-dense grids is expensive. To force regenerate, run
 
 ```bash
 python sim_dQ_grid.py --extra-dense            # writes sim_dQ_grid_extra_dense.json
@@ -57,4 +49,4 @@ python sim_dQ_grid.py --extra-dense            # writes sim_dQ_grid_extra_dense.
 
 ## Tested with
 
-Python 3.12.1, NumPy 2.4.2, Matplotlib 3.10.9, nbconvert 7.16.2, ipykernel 6.29.3, on macOS.
+Python 3.12.1, NumPy 2.4.2, Matplotlib 3.10.9, nbconvert 7.16.2, ipykernel 6.29.3
