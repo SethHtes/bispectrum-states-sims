@@ -1,7 +1,9 @@
 """
 Grid check of the two-parameter hyp/cross rule:
 
-    b2_hyp / b2_cross  ~=  W (1 + Q)^2 / (1 + d)          (arg kappa2 = 0)
+    b2_hyp / b2_cross  ~=  W |1 + Q e^{-i alpha}|^2 / (1 + d),   alpha = arg kappa2
+
+  (for alpha = 0 this is W (1 + Q)^2 / (1 + d); for alpha = pi/2, W (1 + Q^2) / (1 + d))
 
   Q = |B^Q / B^M| on the ridge (QPO amplitude vs quadratic coupling),
   d = dilution power / everything else, at the ridge partner f2 = nu0 - f1,
@@ -11,7 +13,7 @@ Dials: a1 (moves Q, Q ~ a1^-2) and the rms of dilution confined below nu0
 (moves d). Every predicted quantity comes from the per-term power spectra of
 the same simulated light curve, so there are
 no free parameters. Each run is also classified web / cross / hyp / none from
-the measured arm and ridge against the off-locus floor.
+the measured arm and ridge, each against a local floor beside that locus.
 
 Writes fig_dQ_grid.png and sim_dQ_grid.json here. With --dense, runs a
 16 x 19 grid instead and writes sim_dQ_grid_dense.json only (paper_figs.ipynb
@@ -52,6 +54,9 @@ GRIDS = {  # name: (a1 values, nd_rms values, json file)
 }
 NSIG = 3.0  # detection threshold, in standard errors of a locus mean
 DOM = 3.0   # one locus "dominates" when it is DOM times the other
+# bin offsets of the local-floor controls: 6-12 bins (0.19-0.38 Hz at DF = 1/32 Hz) to
+# either side of each locus, clear of the quadratic kernel's band (dband <= 0.1 Hz)
+CTRL = np.r_[-12:-5, 6:13]
 
 
 def run(p):
@@ -80,24 +85,28 @@ def run(p):
         d3 = Dk(k3) / (Pk(k3) - Dk(k3))           # ~0: dilution confined below nu0
         Wk = (Pk(k3) - Dk(k3)) / (Pk(k2) - Dk(k2)) * ((S1 + S2) / (S1 + S3)) ** 2
         Q.append(Qk); d.append(dk); W.append(Wk)
-        pred.append(Wk * (1 + Qk) ** 2 * (1 + d3) / (1 + dk))
+        pred.append(Wk * rule_factor(Qk, p.argk) * (1 + d3) / (1 + dk))
 
-    # measured: means over the same bins, floor from the off-locus control
-    # floor: off-locus patch f1 < f2 in [0.1, 0.4] nu0 (f1 + f2 <= 0.8 nu0, ~1000 bins)
-    o = np.arange(int(0.1 * k0), int(0.4 * k0))
-    iu = np.triu_indices(len(o), 1)
-    fl = float(b2[o[iu[0]] - 1, o[iu[1]] - 1].mean())
-    arm = b2[q - 1, k0 - 1].mean() - fl
-    ridge = b2[q - 1, k0 - q - 1].mean() - fl
-    se = fl / np.sqrt(len(q))                    # b2 under the null ~ exponential, sd = mean
-    det_arm, det_ridge = bool(arm > NSIG * se), bool(ridge > NSIG * se)
+    # measured: means over the same bins, each against its own local floor. The floor
+    # of a locus is the mean b2 of the parallel cells CTRL bins to either side of it
+    # (the arm column shifted to f2 = nu0 + m, the ridge diagonal to f1 + f2 = nu0 + m),
+    # outside the quadratic kernel's band. A single off-locus patch at low f does not
+    # work: there the lognormal flow's own g^2/2 coupling gives b2 ~ (P1P2 + P1P3 +
+    # P2P3)^2 / (P1 P2 P3), ~10/K at sig_g = 0.2, which the arm and ridge do not carry.
+    arm_fl = float(np.mean([b2[q - 1, k0 + m - 1].mean() for m in CTRL]))
+    ridge_fl = float(np.mean([b2[q - 1, k0 + m - q - 1].mean() for m in CTRL]))
+    arm = b2[q - 1, k0 - 1].mean() - arm_fl
+    ridge = b2[q - 1, k0 - q - 1].mean() - ridge_fl
+    # b2 under the null ~ exponential, sd = mean
+    se_arm, se_ridge = arm_fl / np.sqrt(len(q)), ridge_fl / np.sqrt(len(q))
+    det_arm, det_ridge = bool(arm > NSIG * se_arm), bool(ridge > NSIG * se_ridge)
     # ratio, or a bound on it when one locus is below the detection threshold
     if det_arm and det_ridge:
         meas, bound = ridge / arm, "none"
     elif det_ridge:
-        meas, bound = ridge / (NSIG * se), "lower"
+        meas, bound = ridge / (NSIG * se_arm), "lower"
     elif det_arm:
-        meas, bound = NSIG * se / arm, "upper"
+        meas, bound = NSIG * se_ridge / arm, "upper"
     else:
         meas, bound = float("nan"), "none"
     return dict(
@@ -105,7 +114,8 @@ def run(p):
         Q=float(np.median(Q)), d=float(np.median(d)), W=float(np.median(W)),
         pred=float(np.mean(pred)), arm=float(arm), ridge=float(ridge),
         meas=float(meas), bound=bound, det_arm=det_arm, det_ridge=det_ridge,
-        se=float(se), floor=float(fl), pattern=classify(meas, det_arm, det_ridge),
+        se_arm=float(se_arm), se_ridge=float(se_ridge), floor_arm=arm_fl,
+        floor_ridge=ridge_fl, pattern=classify(meas, det_arm, det_ridge),
     )
 
 
@@ -171,20 +181,27 @@ def legend_handles(ms=8):
             for c, m, lab in PAT.values()]
 
 
+def rule_factor(Q, argk):
+    """Ridge enhancement |1 + Q e^{-i argk}|^2: the quadratic channel's biphase on
+    the ridge is -argk, so it adds to the zero-biphase bilinear term as a phasor."""
+    return np.abs(1 + np.asarray(Q) * np.exp(-1j * argk)) ** 2
+
+
 def plot_plane(ax, res, ms=9, label_a1=None, region_labels=True, size_by_b2=False,
-               size_scale=1.0):
+               size_scale=1.0, argk=0.0):
     """The (d, Q) plane: shading is the pattern the rule predicts (ratio beyond
     DOM or 1/DOM, with W at its grid median), markers are the measured pattern
     of each run at its predicted (d, Q). Undiluted runs sit at the left edge.
     label_a1: the a1 values whose rows get a label at the right (default all).
     size_by_b2: marker area set by b2_overall (log-scaled, see b2_size) instead of ms;
-    size_scale multiplies those areas (and edge widths by its square root)."""
+    size_scale multiplies those areas (and edge widths by its square root).
+    argk: phase of kappa2 used by the grid's runs; sets the rule's |1 + Q e^{-i argk}|^2."""
     from matplotlib.colors import ListedColormap
     Wm = np.median([r["W"] for r in res])
     dmin = 10**-2.85
     dd, QQ = np.logspace(-2.95, 2.5, 300), np.logspace(-2.5, 1.5, 300)
     Dg, Qg = np.meshgrid(dd, QQ)
-    Z = Wm * (1 + Qg) ** 2 / (1 + Dg)
+    Z = Wm * rule_factor(Qg, argk) / (1 + Dg)
     zone = np.digitize(Z, [1 / DOM, DOM])  # 0 cross, 1 web, 2 hyp
     cmap = ListedColormap([PAT["cross"][0], PAT["web"][0], PAT["hyp"][0]])
     ax.pcolormesh(Dg, Qg, zone, cmap=cmap, alpha=0.13, shading="auto", lw=0,
